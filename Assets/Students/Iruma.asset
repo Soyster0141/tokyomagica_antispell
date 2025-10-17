@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb07235741468b74fa77bc128d20e402, type: 3}
+  m_Name: Iruma
+  m_EditorClassIdentifier: 
+  characterName: "\u30A4\u30EB\u30DE\u30FB\u30AD\u30EA\u30FC\u30ED\u30D5"
+  description: "\u4F7F\u3048\u308B\u6587\u5B57\u3082\u591A\u304F\u3001\u30D0\u30E9\u30F3\u30B9\u306E\u53D6\u308C\u305F\u6027\u80FD\u3002"
+  maxHP: 100
+  availableCharacters: "\u30A2\u30A4\u30A6\u30A8\u30AB\u30AD\u30AF\u30B1\u30B5\u30B7\u30B9\u30BB\u30BF\u30C1\u30C4\u30C6\u30CA\u30CB\u30CC\u30CD\u30CF\u30D2\u30D5\u30D8\u30DE\u30DF\u30E0\u30E1\u30E4\u30E6\u30E9\u30EA\u30EB\u30EC\u30EF\u30AC\u30AE\u30B0\u30B2\u30B6\u30B8\u30BA\u30BC\u30C0\u30C2\u30C5\u30C7\u30D0\u30D3\u30D6\u30D9\u30D1\u30D4\u30D7\u30DA\u30A1\u30A3\u30A5\u30A7\u30C3\u30E3\u30E5"
+  damageMultiplier: 1
+  timeBonus: 0
+  specialAbility: 

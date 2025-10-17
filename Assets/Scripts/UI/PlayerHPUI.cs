@@ -1,0 +1,99 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+/// <summary>
+/// プレイヤーのHPを表示するUI
+/// </summary>
+public class PlayerHPUI : MonoBehaviour
+{
+    [Header("設定")]
+    [SerializeField] private int playerNumber = 1;
+    
+    [Header("UI要素")]
+    [SerializeField] private TextMeshProUGUI playerNameText;
+    [SerializeField] private TextMeshProUGUI hpText;
+    [SerializeField] private Slider hpSlider;
+    [SerializeField] private Image hpFillImage;
+    
+    [Header("HPバーの色")]
+    [SerializeField] private Color highHPColor = Color.green;
+    [SerializeField] private Color mediumHPColor = Color.yellow;
+    [SerializeField] private Color lowHPColor = Color.red;
+    
+    private PlayerData playerData;
+    
+    void Start()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnGameStateChanged.AddListener(OnGameStateChanged);
+            GameManager.Instance.OnDamageDealt.AddListener(OnDamageDealt);
+        }
+        
+        UpdateDisplay();
+    }
+    
+    void OnGameStateChanged(GameState newState)
+    {
+        if (newState == GameState.Initialization)
+        {
+            UpdateDisplay();
+        }
+    }
+    
+    void OnDamageDealt(int damagedPlayerNumber, int damage)
+    {
+        if (damagedPlayerNumber == playerNumber)
+        {
+            UpdateDisplay();
+        }
+    }
+    
+    void UpdateDisplay()
+    {
+        if (GameManager.Instance == null) return;
+        
+        playerData = GameManager.Instance.GetPlayerData(playerNumber);
+        
+        if (playerData == null) return;
+        
+        // プレイヤー名表示
+        if (playerNameText != null)
+        {
+            playerNameText.text = playerData.playerName;
+        }
+        
+        // HP数値表示
+        if (hpText != null)
+        {
+            hpText.text = $"HP: {playerData.currentHP} / {playerData.maxHP}";
+        }
+        
+        // HPバー表示
+        if (hpSlider != null)
+        {
+            hpSlider.maxValue = playerData.maxHP;
+            hpSlider.value = playerData.currentHP;
+        }
+        
+        // HPバーの色変更
+        if (hpFillImage != null)
+        {
+            float hpRatio = playerData.GetHPRatio();
+            
+            if (hpRatio > 0.6f)
+            {
+                hpFillImage.color = highHPColor;
+            }
+            else if (hpRatio > 0.3f)
+            {
+                hpFillImage.color = mediumHPColor;
+            }
+            else
+            {
+                hpFillImage.color = lowHPColor;
+            }
+        }
+    }
+}
