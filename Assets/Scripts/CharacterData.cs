@@ -22,6 +22,23 @@ public class CharacterData : ScriptableObject
     [TextArea(5, 10)]
     public string availableCharacters;
     
+    [Header("魔力成長システム")]
+    [Tooltip("完全成功時の魔力獲得量")]
+    public int manaGainPerPerfect = 10;
+    
+    [Tooltip("ミス1回ごとの魔力減少率（0.2 = 20%減少）")]
+    [Range(0f, 1f)]
+    public float manaReductionPerMiss = 0.2f;
+    
+    [Tooltip("レベルアップに必要な魔力")]
+    public int manaRequiredForLevelUp = 20;
+    
+    [Tooltip("詠唱最大文字数（初期値）")]
+    public int initialMaxStringLength = 3;
+    
+    [Tooltip("詠唱最大文字数（最大値）")]
+    public int maxStringLengthLimit = 10;
+    
     [Header("将来の拡張用")]
     [Tooltip("ダメージ倍率（1.0が標準）")]
     public float damageMultiplier = 1.0f;

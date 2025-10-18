@@ -19,6 +19,9 @@ public class StringCreationUI : MonoBehaviour
     [Header("エフェクト")]
     [SerializeField] private SpellCastEffect spellCastEffect;
     
+    [Header("タイマー")]
+    [SerializeField] private StringCreationTimer creationTimer;
+    
     private List<Button> characterButtons = new List<Button>();
     private string currentString = "";
     private GameSettings settings;
@@ -267,7 +270,10 @@ public class StringCreationUI : MonoBehaviour
     
     void OnCharacterButtonClicked(char character)
     {
-        if (settings != null && currentString.Length < settings.maxStringLength)
+        // 現在のプレイヤーの最大文字数を取得
+        int maxLength = GetCurrentPlayerMaxStringLength();
+        
+        if (currentString.Length < maxLength)
         {
             currentString += character;
             UpdateCurrentStringDisplay();
@@ -297,9 +303,29 @@ public class StringCreationUI : MonoBehaviour
     {
         if (confirmButton != null && settings != null)
         {
+            int maxLength = GetCurrentPlayerMaxStringLength();
             confirmButton.interactable = currentString.Length >= settings.minStringLength &&
-                                        currentString.Length <= settings.maxStringLength;
+                                        currentString.Length <= maxLength;
         }
+    }
+    
+    /// <summary>
+    /// 現在のプレイヤーの最大文字数を取得
+    /// </summary>
+    int GetCurrentPlayerMaxStringLength()
+    {
+        TurnData turn = GameManager.Instance?.GetCurrentTurn();
+        if (turn != null)
+        {
+            ManaGrowthSystem manaSystem = GameManager.Instance.GetPlayerManaSystem(turn.creatorPlayerNumber);
+            if (manaSystem != null)
+            {
+                return manaSystem.CurrentMaxStringLength;
+            }
+        }
+        
+        // デフォルト
+        return settings?.maxStringLength ?? 10;
     }
     
     void OnConfirmButtonClicked()
@@ -318,7 +344,61 @@ public class StringCreationUI : MonoBehaviour
                 }
             }
             
+            // タイマーを停止
+            if (creationTimer != null)
+            {
+                creationTimer.StopTimer();
+            }
+            
             GameManager.Instance.OnStringCreated(currentString);
+        }
+    }
+    
+    /// <summary>
+    /// 時間切れ時の処理
+    /// </summary>
+    public void OnTimeExpired()
+    {
+        Debug.Log("[StringCreationUI] 時間切れ処理開始");
+        
+        if (GameManager.Instance == null) return;
+        
+        TurnData turn = GameManager.Instance.GetCurrentTurn();
+        if (turn == null) return;
+        
+        // 1文字以上入力済みの場合：その文字列で確定
+        if (!string.IsNullOrEmpty(currentString))
+        {
+            Debug.Log($"[StringCreationUI] 時間切れ - 入力済み文字列で確定: {currentString}");
+            
+            // 詠唱エフェクトを再生
+            if (spellCastEffect != null && currentStringText != null)
+            {
+                PlayerData player = GameManager.Instance.GetPlayerData(turn.creatorPlayerNumber);
+                string playerName = player != null ? player.playerName : "";
+                spellCastEffect.PlayCastEffect(playerName, currentStringText.transform.position);
+            }
+            
+            GameManager.Instance.OnStringCreated(currentString);
+        }
+        // 0文字（空）の場合：ペナルティ
+        else
+        {
+            Debug.Log("[StringCreationUI] 時間切れ - 空文字列でペナルティ");
+            
+            // ペナルティダメージを計算
+            PlayerData player = GameManager.Instance.GetPlayerData(turn.creatorPlayerNumber);
+            if (player != null && creationTimer != null)
+            {
+                int penaltyDamage = creationTimer.CalculatePenaltyDamage(player.maxHP);
+                Debug.Log($"[StringCreationUI] ペナルティダメージ: {penaltyDamage}");
+                
+                // ダメージを与える
+                GameManager.Instance.ApplyDamage(turn.creatorPlayerNumber, penaltyDamage);
+            }
+            
+            // 空文字列で次のフェーズへ（タイピングフェーズはスキップされる）
+            GameManager.Instance.OnStringCreated("");
         }
     }
 }

@@ -16,6 +16,10 @@ public class GameManager : MonoBehaviour
     private CharacterData player1Character;
     private CharacterData player2Character;
     
+    [Header("魔力成長システム")]
+    private ManaGrowthSystem player1Mana;
+    private ManaGrowthSystem player2Mana;
+    
     [Header("ゲーム状態")]
     private GameState currentState;
     private TurnData currentTurn;
@@ -148,6 +152,28 @@ public class GameManager : MonoBehaviour
         
         OnDamageDealt?.Invoke(currentTurn.typerPlayerNumber, damage);
         
+        // 魔力獲得処理（タイピングしたプレイヤー）
+        int missCount = currentTurn.createdString.Length - correctChars;
+        ManaGrowthSystem typerMana = GetPlayerManaSystem(currentTurn.typerPlayerNumber);
+        
+        if (typerMana != null)
+        {
+            int gainedMana = typerMana.GainMana(missCount);
+            
+            if (settings.showDebugLogs)
+            {
+                Debug.Log($"魔力獲得: +{gainedMana} (ミス: {missCount}回) - 現在: {typerMana.CurrentMana}");
+            }
+            
+            // レベルアップ判定
+            if (typerMana.CanLevelUp())
+            {
+                typerMana.LevelUp();
+                // TODO: レベルアップ演出
+                Debug.Log($"Player {currentTurn.typerPlayerNumber} レベルアップ！最大文字数: {typerMana.CurrentMaxStringLength}");
+            }
+        }
+        
         // ゲーム終了判定
         if (!damagedPlayer.IsAlive())
         {
@@ -265,6 +291,10 @@ public class GameManager : MonoBehaviour
         player1 = new PlayerData(char1.characterName, char1.maxHP, 1);
         player2 = new PlayerData(char2.characterName, char2.maxHP, 2);
         
+        // 魔力システム初期化
+        player1Mana = new ManaGrowthSystem(char1);
+        player2Mana = new ManaGrowthSystem(char2);
+        
         // 初期制限時間設定
         currentTimeLimit = settings.initialTimeLimit;
         
@@ -281,5 +311,46 @@ public class GameManager : MonoBehaviour
     public CharacterData GetPlayerCharacter(int playerNumber)
     {
         return playerNumber == 1 ? player1Character : player2Character;
+    }
+    
+    /// <summary>
+    /// プレイヤーの魔力システムを取得
+    /// </summary>
+    public ManaGrowthSystem GetPlayerManaSystem(int playerNumber)
+    {
+        return playerNumber == 1 ? player1Mana : player2Mana;
+    }
+    
+    /// <summary>
+    /// プレイヤーにダメージを与える
+    /// </summary>
+    public void ApplyDamage(int playerNumber, int damage)
+    {
+        PlayerData player = GetPlayerData(playerNumber);
+        if (player == null)
+        {
+            Debug.LogError($"Player {playerNumber} が見つかりません！");
+            return;
+        }
+        
+        // ダメージを適用
+        player.currentHP = Mathf.Max(0, player.currentHP - damage);
+        
+        // イベント発火
+        OnDamageDealt?.Invoke(playerNumber, damage);
+        
+        if (settings.showDebugLogs)
+        {
+            Debug.Log($"Player {playerNumber} が {damage} ダメージを受けました。HP: {player.currentHP}/{player.maxHP}");
+        }
+        
+        // HPが0になったら敗北
+        if (player.currentHP <= 0)
+        {
+            OnPlayerDefeated?.Invoke(playerNumber);
+            int winnerNumber = playerNumber == 1 ? 2 : 1;
+            OnGameWon?.Invoke(winnerNumber);
+            ChangeState(GameState.GameOver);
+        }
     }
 }

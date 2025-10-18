@@ -31,6 +31,8 @@ public class GameSceneSetup : EditorWindow
         // UI要素の作成
         CreateTurnInfoUI(canvas);
         CreatePlayerHPUIs(canvas);
+        CreateCharacterSelectionUI(canvas);
+        CreateStringCreationTimerUI(canvas);
         CreateStringCreationUI(canvas);
         CreateTypingUI(canvas);
         CreateGameOverUI(canvas);
@@ -119,11 +121,14 @@ public class GameSceneSetup : EditorWindow
     
     static void CreatePlayerHPUIs(GameObject canvas)
     {
-        // Player1 HP
+        // Player1 HP & Mana
         CreatePlayerHPUI(canvas, 1, new Vector2(50, -50));
         
-        // Player2 HP
+        // Player2 HP & Mana
         CreatePlayerHPUI(canvas, 2, new Vector2(-50, -50));
+        
+        // ManaUI Managerを作成
+        CreateManaUIManager(canvas);
         
         Debug.Log("PlayerHPUI作成完了");
     }
@@ -208,6 +213,9 @@ public class GameSceneSetup : EditorWindow
         slider.value = 100;
         slider.interactable = false;
         
+        // 魔力ゲージを作成
+        GameObject manaSliderObj = CreateManaBar(hpUIObj, playerNumber);
+        
         // PlayerHPUIにアサイン
         SerializedObject so = new SerializedObject(hpUI);
         so.FindProperty("playerNumber").intValue = playerNumber;
@@ -231,7 +239,8 @@ public class GameSceneSetup : EditorWindow
         panelRT.anchorMax = Vector2.one;
         panelRT.sizeDelta = Vector2.zero;
         
-        StringCreationUI creationUI = panelObj.AddComponent<StringCreationUI>();
+        // StringCreationUIをCanvasにアタッチ（Panelではなく）
+        StringCreationUI creationUI = canvas.AddComponent<StringCreationUI>();
         
         // 説明文
         GameObject instructionObj = new GameObject("Instruction");
@@ -306,6 +315,9 @@ public class GameSceneSetup : EditorWindow
         Button confirmBtn = confirmObj.GetComponent<Button>();
         confirmBtn.interactable = false;
         
+        // StringCreationTimerを検索
+        StringCreationTimer timer = canvas.GetComponentInChildren<StringCreationTimer>(true);
+        
         // StringCreationUIにアサイン
         SerializedObject so = new SerializedObject(creationUI);
         so.FindProperty("creationPanel").objectReferenceValue = panelObj;
@@ -314,6 +326,7 @@ public class GameSceneSetup : EditorWindow
         so.FindProperty("confirmButton").objectReferenceValue = confirmBtn;
         so.FindProperty("characterButtonContainer").objectReferenceValue = contentObj.transform;
         so.FindProperty("characterButtonPrefab").objectReferenceValue = buttonPrefab;
+        so.FindProperty("creationTimer").objectReferenceValue = timer;
         so.ApplyModifiedProperties();
         
         panelObj.SetActive(false);
@@ -358,7 +371,8 @@ public class GameSceneSetup : EditorWindow
         panelRT.anchorMax = Vector2.one;
         panelRT.sizeDelta = Vector2.zero;
         
-        TypingUI typingUI = panelObj.AddComponent<TypingUI>();
+        // TypingUIをCanvasにアタッチ（Panelではなく）
+        TypingUI typingUI = canvas.AddComponent<TypingUI>();
         
         // 説明文
         GameObject instructionObj = new GameObject("Instruction");
@@ -478,7 +492,8 @@ public class GameSceneSetup : EditorWindow
         panelRT.anchorMax = Vector2.one;
         panelRT.sizeDelta = Vector2.zero;
         
-        GameOverUI gameOverUI = panelObj.AddComponent<GameOverUI>();
+        // GameOverUIをCanvasにアタッチ（Panelではなく）
+        GameOverUI gameOverUI = canvas.AddComponent<GameOverUI>();
         
         // 結果テキスト
         GameObject resultObj = new GameObject("ResultText");
@@ -538,5 +553,298 @@ public class GameSceneSetup : EditorWindow
         textRT.sizeDelta = Vector2.zero;
         
         return btnObj;
+    }
+    
+    /// <summary>
+    /// 魔力ゲージを作成
+    /// </summary>
+    static GameObject CreateManaBar(GameObject parent, int playerNumber)
+    {
+        GameObject manaSliderObj = new GameObject($"Player{playerNumber}ManaBar");
+        manaSliderObj.transform.SetParent(parent.transform, false);
+        
+        Slider slider = manaSliderObj.AddComponent<Slider>();
+        RectTransform sliderRT = manaSliderObj.GetComponent<RectTransform>();
+        sliderRT.anchorMin = new Vector2(0, -0.2f);
+        sliderRT.anchorMax = new Vector2(1, 0);
+        sliderRT.sizeDelta = Vector2.zero;
+        
+        // スライダーの背景
+        GameObject bgObj = new GameObject("Background");
+        bgObj.transform.SetParent(manaSliderObj.transform, false);
+        Image bgImage = bgObj.AddComponent<Image>();
+        bgImage.color = new Color(0.2f, 0.2f, 0.2f);
+        RectTransform bgRT = bgObj.GetComponent<RectTransform>();
+        bgRT.anchorMin = Vector2.zero;
+        bgRT.anchorMax = Vector2.one;
+        bgRT.sizeDelta = Vector2.zero;
+        
+        // Fill Area
+        GameObject fillAreaObj = new GameObject("Fill Area");
+        fillAreaObj.transform.SetParent(manaSliderObj.transform, false);
+        RectTransform fillAreaRT = fillAreaObj.AddComponent<RectTransform>();
+        fillAreaRT.anchorMin = Vector2.zero;
+        fillAreaRT.anchorMax = Vector2.one;
+        fillAreaRT.sizeDelta = new Vector2(-10, -10);
+        
+        // Fill
+        GameObject fillObj = new GameObject("Fill");
+        fillObj.transform.SetParent(fillAreaObj.transform, false);
+        Image fillImage = fillObj.AddComponent<Image>();
+        fillImage.color = new Color(0.3f, 0.3f, 1f); // 青/紫系
+        RectTransform fillRT = fillObj.GetComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero;
+        fillRT.anchorMax = Vector2.one;
+        fillRT.sizeDelta = Vector2.zero;
+        
+        slider.fillRect = fillRT;
+        slider.maxValue = 20;
+        slider.value = 0;
+        slider.interactable = false;
+        
+        // Player2の場合は右から左に
+        if (playerNumber == 2)
+        {
+            slider.direction = Slider.Direction.RightToLeft;
+        }
+        
+        return manaSliderObj;
+    }
+    
+    /// <summary>
+    /// ManaUI Managerを作成
+    /// </summary>
+    static void CreateManaUIManager(GameObject canvas)
+    {
+        GameObject manaUIObj = new GameObject("ManaUIManager");
+        manaUIObj.transform.SetParent(canvas.transform, false);
+        
+        ManaUI manaUI = manaUIObj.AddComponent<ManaUI>();
+        
+        // 最大文字数表示を作成
+        GameObject maxLengthObj = new GameObject("MaxStringLengthText");
+        maxLengthObj.transform.SetParent(canvas.transform, false);
+        TextMeshProUGUI maxLengthText = maxLengthObj.AddComponent<TextMeshProUGUI>();
+        maxLengthText.text = "詠唱可能: 3/10文字";
+        maxLengthText.fontSize = 28;
+        maxLengthText.alignment = TextAlignmentOptions.Center;
+        maxLengthText.color = Color.yellow;
+        
+        RectTransform maxLengthRT = maxLengthObj.GetComponent<RectTransform>();
+        maxLengthRT.anchorMin = new Vector2(0.5f, 0.65f);
+        maxLengthRT.anchorMax = new Vector2(0.5f, 0.65f);
+        maxLengthRT.pivot = new Vector2(0.5f, 0.5f);
+        maxLengthRT.anchoredPosition = Vector2.zero;
+        maxLengthRT.sizeDelta = new Vector2(400, 50);
+        
+        // ManaBarを取得
+        Transform player1HP = canvas.transform.Find("Player1HP");
+        Transform player2HP = canvas.transform.Find("Player2HP");
+        
+        Slider player1ManaBar = player1HP?.Find("Player1ManaBar")?.GetComponent<Slider>();
+        Slider player2ManaBar = player2HP?.Find("Player2ManaBar")?.GetComponent<Slider>();
+        
+        // ManaUIにアサイン
+        SerializedObject so = new SerializedObject(manaUI);
+        so.FindProperty("player1ManaBar").objectReferenceValue = player1ManaBar;
+        so.FindProperty("player2ManaBar").objectReferenceValue = player2ManaBar;
+        so.FindProperty("maxStringLengthText").objectReferenceValue = maxLengthText;
+        so.ApplyModifiedProperties();
+        
+        Debug.Log("ManaUI Manager作成完了");
+    }
+    
+    /// <summary>
+    /// キャラクター選択画面を作成
+    /// </summary>
+    static void CreateCharacterSelectionUI(GameObject canvas)
+    {
+        GameObject panelObj = new GameObject("CharacterSelectionPanel");
+        panelObj.transform.SetParent(canvas.transform, false);
+        
+        Image panelImage = panelObj.AddComponent<Image>();
+        panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+        
+        RectTransform panelRT = panelObj.GetComponent<RectTransform>();
+        panelRT.anchorMin = Vector2.zero;
+        panelRT.anchorMax = Vector2.one;
+        panelRT.sizeDelta = Vector2.zero;
+        
+        // CharacterSelectionUIをCanvasにアタッチ
+        CharacterSelectionUI selectionUI = canvas.AddComponent<CharacterSelectionUI>();
+        
+        // InstructionText
+        GameObject instructionObj = new GameObject("InstructionText");
+        instructionObj.transform.SetParent(panelObj.transform, false);
+        TextMeshProUGUI instructionText = instructionObj.AddComponent<TextMeshProUGUI>();
+        instructionText.text = "Player 1: キャラクターを選択してください";
+        instructionText.fontSize = 32;
+        instructionText.alignment = TextAlignmentOptions.Center;
+        RectTransform instructionRT = instructionObj.GetComponent<RectTransform>();
+        instructionRT.anchorMin = new Vector2(0.1f, 0.85f);
+        instructionRT.anchorMax = new Vector2(0.9f, 0.95f);
+        instructionRT.sizeDelta = Vector2.zero;
+        
+        // CharacterButtonContainer
+        GameObject containerObj = new GameObject("CharacterButtonContainer");
+        containerObj.transform.SetParent(panelObj.transform, false);
+        RectTransform containerRT = containerObj.AddComponent<RectTransform>();
+        containerRT.anchorMin = new Vector2(0.25f, 0.5f);
+        containerRT.anchorMax = new Vector2(0.75f, 0.75f);
+        containerRT.sizeDelta = Vector2.zero;
+        
+        HorizontalLayoutGroup layout = containerObj.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 20;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        
+        // CharacterInfoPanel
+        GameObject infoPanelObj = new GameObject("CharacterInfoPanel");
+        infoPanelObj.transform.SetParent(panelObj.transform, false);
+        Image infoPanelImage = infoPanelObj.AddComponent<Image>();
+        infoPanelImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+        RectTransform infoPanelRT = infoPanelObj.GetComponent<RectTransform>();
+        infoPanelRT.anchorMin = new Vector2(0.25f, 0.25f);
+        infoPanelRT.anchorMax = new Vector2(0.75f, 0.45f);
+        infoPanelRT.sizeDelta = Vector2.zero;
+        
+        // CharacterNameText
+        GameObject nameObj = new GameObject("CharacterNameText");
+        nameObj.transform.SetParent(infoPanelObj.transform, false);
+        TextMeshProUGUI nameText = nameObj.AddComponent<TextMeshProUGUI>();
+        nameText.text = "キャラクターを選択してください";
+        nameText.fontSize = 28;
+        nameText.alignment = TextAlignmentOptions.Center;
+        RectTransform nameRT = nameObj.GetComponent<RectTransform>();
+        nameRT.anchorMin = new Vector2(0.1f, 0.7f);
+        nameRT.anchorMax = new Vector2(0.9f, 0.95f);
+        nameRT.sizeDelta = Vector2.zero;
+        
+        // CharacterHPText
+        GameObject hpObj = new GameObject("CharacterHPText");
+        hpObj.transform.SetParent(infoPanelObj.transform, false);
+        TextMeshProUGUI hpText = hpObj.AddComponent<TextMeshProUGUI>();
+        hpText.text = "";
+        hpText.fontSize = 24;
+        hpText.alignment = TextAlignmentOptions.Center;
+        RectTransform hpRT = hpObj.GetComponent<RectTransform>();
+        hpRT.anchorMin = new Vector2(0.1f, 0.5f);
+        hpRT.anchorMax = new Vector2(0.9f, 0.7f);
+        hpRT.sizeDelta = Vector2.zero;
+        
+        // CharacterDescriptionText
+        GameObject descObj = new GameObject("CharacterDescriptionText");
+        descObj.transform.SetParent(infoPanelObj.transform, false);
+        TextMeshProUGUI descText = descObj.AddComponent<TextMeshProUGUI>();
+        descText.text = "";
+        descText.fontSize = 18;
+        descText.alignment = TextAlignmentOptions.Center;
+        RectTransform descRT = descObj.GetComponent<RectTransform>();
+        descRT.anchorMin = new Vector2(0.1f, 0.1f);
+        descRT.anchorMax = new Vector2(0.9f, 0.5f);
+        descRT.sizeDelta = Vector2.zero;
+        
+        // ConfirmButton
+        GameObject confirmObj = CreateButton(panelObj, "ConfirmButton", "決定", new Vector2(0.4f, 0.1f), new Vector2(0.6f, 0.2f));
+        Button confirmBtn = confirmObj.GetComponent<Button>();
+        confirmBtn.interactable = false;
+        
+        // CharacterSelectionManagerを作成
+        GameObject managerObj = new GameObject("CharacterSelectionManager");
+        managerObj.transform.SetParent(canvas.transform, false);
+        CharacterSelectionManager manager = managerObj.AddComponent<CharacterSelectionManager>();
+        
+        // CharacterSelectionUIにアサイン
+        SerializedObject so = new SerializedObject(selectionUI);
+        so.FindProperty("selectionPanel").objectReferenceValue = panelObj;
+        so.FindProperty("instructionText").objectReferenceValue = instructionText;
+        so.FindProperty("characterButtonContainer").objectReferenceValue = containerObj.transform;
+        so.FindProperty("characterNameText").objectReferenceValue = nameText;
+        so.FindProperty("characterHPText").objectReferenceValue = hpText;
+        so.FindProperty("characterDescriptionText").objectReferenceValue = descText;
+        so.FindProperty("confirmButton").objectReferenceValue = confirmBtn;
+        // characterButtonPrefabとavailableCharactersは手動で設定が必要
+        so.ApplyModifiedProperties();
+        
+        // CharacterSelectionManagerにアサイン
+        SerializedObject managerSO = new SerializedObject(manager);
+        managerSO.FindProperty("selectionUI").objectReferenceValue = selectionUI;
+        managerSO.ApplyModifiedProperties();
+        
+        panelObj.SetActive(false);
+        Debug.Log("CharacterSelectionUI作成完了（CharacterButtonPrefabとAvailableCharactersは手動設定が必要）");
+    }
+    
+    static void CreateStringCreationTimerUI(GameObject canvas)
+    {
+        // StringCreationTimerマネージャーを作成
+        GameObject timerManagerObj = new GameObject("StringCreationTimer");
+        timerManagerObj.transform.SetParent(canvas.transform, false);
+        StringCreationTimer timer = timerManagerObj.AddComponent<StringCreationTimer>();
+        
+        // TimerPanel（タイマーUIのコンテナ）
+        GameObject timerPanelObj = new GameObject("StringCreationTimerPanel");
+        timerPanelObj.transform.SetParent(canvas.transform, false);
+        
+        RectTransform panelRT = timerPanelObj.AddComponent<RectTransform>();
+        panelRT.anchorMin = new Vector2(0.25f, 0.85f);
+        panelRT.anchorMax = new Vector2(0.75f, 0.95f);
+        panelRT.sizeDelta = Vector2.zero;
+        
+        // 背景パネル（オプション）
+        Image panelBg = timerPanelObj.AddComponent<Image>();
+        panelBg.color = new Color(0, 0, 0, 0.5f);
+        
+        // TimerText（残り時間表示）
+        GameObject timerTextObj = new GameObject("TimerText");
+        timerTextObj.transform.SetParent(timerPanelObj.transform, false);
+        TextMeshProUGUI timerText = timerTextObj.AddComponent<TextMeshProUGUI>();
+        timerText.text = "残り時間: 30秒";
+        timerText.fontSize = 24;
+        timerText.alignment = TextAlignmentOptions.Center;
+        timerText.color = Color.white;
+        
+        RectTransform textRT = timerTextObj.GetComponent<RectTransform>();
+        textRT.anchorMin = new Vector2(0, 0.5f);
+        textRT.anchorMax = new Vector2(1, 1);
+        textRT.sizeDelta = Vector2.zero;
+        
+        // TimerProgressBar（プログレスバー）
+        GameObject barBgObj = new GameObject("ProgressBarBackground");
+        barBgObj.transform.SetParent(timerPanelObj.transform, false);
+        Image barBg = barBgObj.AddComponent<Image>();
+        barBg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+        
+        RectTransform barBgRT = barBgObj.GetComponent<RectTransform>();
+        barBgRT.anchorMin = new Vector2(0.1f, 0.1f);
+        barBgRT.anchorMax = new Vector2(0.9f, 0.4f);
+        barBgRT.sizeDelta = Vector2.zero;
+        
+        // Fill（実際のバー）
+        GameObject fillObj = new GameObject("Fill");
+        fillObj.transform.SetParent(barBgObj.transform, false);
+        Image fillImage = fillObj.AddComponent<Image>();
+        fillImage.color = new Color(0.2f, 0.6f, 1f); // 青色
+        fillImage.type = Image.Type.Filled;
+        fillImage.fillMethod = Image.FillMethod.Horizontal;
+        fillImage.fillAmount = 1.0f;
+        
+        RectTransform fillRT = fillObj.GetComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero;
+        fillRT.anchorMax = Vector2.one;
+        fillRT.sizeDelta = Vector2.zero;
+        
+        // StringCreationTimerにアサイン
+        SerializedObject timerSO = new SerializedObject(timer);
+        timerSO.FindProperty("timerText").objectReferenceValue = timerText;
+        timerSO.FindProperty("timerProgressBar").objectReferenceValue = fillImage;
+        timerSO.FindProperty("timerPanel").objectReferenceValue = timerPanelObj;
+        timerSO.ApplyModifiedProperties();
+        
+        timerPanelObj.SetActive(false);
+        Debug.Log("StringCreationTimer作成完了");
     }
 }
