@@ -16,6 +16,9 @@ public class StringCreationUI : MonoBehaviour
     [SerializeField] private Transform characterButtonContainer;
     [SerializeField] private GameObject characterButtonPrefab;
     
+    [Header("エフェクト")]
+    [SerializeField] private SpellCastEffect spellCastEffect;
+    
     private List<Button> characterButtons = new List<Button>();
     private string currentString = "";
     private GameSettings settings;
@@ -89,7 +92,7 @@ public class StringCreationUI : MonoBehaviour
             PlayerData player = GameManager.Instance.GetPlayerData(turnData.creatorPlayerNumber);
             string playerName = player != null ? player.playerName : $"Player {turnData.creatorPlayerNumber}";
             
-            instructionText.text = $"{playerName}: 文字を選んで文字列を作成してください\n" +
+            instructionText.text = $"{playerName}: 呪文を詠唱せよ\n" +
                                   $"（{settings.minStringLength}～{settings.maxStringLength}文字）";
         }
     }
@@ -286,7 +289,7 @@ public class StringCreationUI : MonoBehaviour
     {
         if (currentStringText != null)
         {
-            currentStringText.text = string.IsNullOrEmpty(currentString) ? "（文字列）" : currentString;
+            currentStringText.text = string.IsNullOrEmpty(currentString) ? "（呪文）" : currentString;
         }
     }
     
@@ -303,6 +306,18 @@ public class StringCreationUI : MonoBehaviour
     {
         if (GameManager.Instance != null && !string.IsNullOrEmpty(currentString))
         {
+            // 詠唱エフェクトを再生
+            if (spellCastEffect != null && currentStringText != null)
+            {
+                TurnData turn = GameManager.Instance.GetCurrentTurn();
+                if (turn != null)
+                {
+                    PlayerData player = GameManager.Instance.GetPlayerData(turn.creatorPlayerNumber);
+                    string playerName = player != null ? player.playerName : "";
+                    spellCastEffect.PlayCastEffect(playerName, currentStringText.transform.position);
+                }
+            }
+            
             GameManager.Instance.OnStringCreated(currentString);
         }
     }

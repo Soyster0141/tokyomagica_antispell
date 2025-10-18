@@ -141,7 +141,9 @@ public class TypingUI : MonoBehaviour
         
         if (instructionText != null)
         {
-            instructionText.text = $"Player {turn.typerPlayerNumber}: 以下の文字列を逆から入力してください！";
+            PlayerData player = GameManager.Instance.GetPlayerData(turn.typerPlayerNumber);
+            string playerName = player != null ? player.playerName : $"Player {turn.typerPlayerNumber}";
+            instructionText.text = $"{playerName}: 呪文を相殺せよ！";
         }
         
         if (targetStringText != null)
