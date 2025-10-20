@@ -270,6 +270,12 @@ public class StringCreationUI : MonoBehaviour
     
     void OnCharacterButtonClicked(char character)
     {
+        // SE再生
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayCharacterButtonClick();
+        }
+        
         // 現在のプレイヤーの最大文字数を取得
         int maxLength = GetCurrentPlayerMaxStringLength();
         
@@ -283,6 +289,12 @@ public class StringCreationUI : MonoBehaviour
     
     public void OnBackspaceButtonClicked()
     {
+        // SE再生
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBackspaceButtonClick();
+        }
+        
         if (currentString.Length > 0)
         {
             currentString = currentString.Substring(0, currentString.Length - 1);
@@ -332,6 +344,12 @@ public class StringCreationUI : MonoBehaviour
     {
         if (GameManager.Instance != null && !string.IsNullOrEmpty(currentString))
         {
+            // SE再生
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayConfirmButtonClick();
+            }
+            
             // 詠唱エフェクトを再生
             if (spellCastEffect != null && currentStringText != null)
             {
@@ -341,6 +359,12 @@ public class StringCreationUI : MonoBehaviour
                     PlayerData player = GameManager.Instance.GetPlayerData(turn.creatorPlayerNumber);
                     string playerName = player != null ? player.playerName : "";
                     spellCastEffect.PlayCastEffect(playerName, currentStringText.transform.position);
+                    
+                    // 詠唱エフェクトSE再生
+                    if (AudioManager.Instance != null)
+                    {
+                        AudioManager.Instance.PlaySpellCast();
+                    }
                 }
             }
             
@@ -377,6 +401,12 @@ public class StringCreationUI : MonoBehaviour
                 PlayerData player = GameManager.Instance.GetPlayerData(turn.creatorPlayerNumber);
                 string playerName = player != null ? player.playerName : "";
                 spellCastEffect.PlayCastEffect(playerName, currentStringText.transform.position);
+                
+                // 詠唱エフェクトSE再生
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySpellCast();
+                }
             }
             
             GameManager.Instance.OnStringCreated(currentString);

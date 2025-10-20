@@ -25,6 +25,9 @@ public class GameSceneSetup : EditorWindow
         // GameManagerの作成
         CreateGameManager();
         
+        // AudioManagerの作成
+        CreateAudioManager();
+        
         // Canvasの作成
         GameObject canvas = CreateCanvas();
         
@@ -54,6 +57,14 @@ public class GameSceneSetup : EditorWindow
         gmObj.AddComponent<GameManager>();
         
         Debug.Log("GameManager作成完了");
+    }
+    
+    static void CreateAudioManager()
+    {
+        GameObject audioObj = new GameObject("AudioManager");
+        audioObj.AddComponent<AudioManager>();
+        
+        Debug.Log("AudioManager作成完了");
     }
     
     static GameObject CreateCanvas()
