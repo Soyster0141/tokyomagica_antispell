@@ -14,6 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterName: "\u30A6\u30E9\u30E9\u30FB\u30A2\u30F3\u30C7\u30EB\u30BB\u30F3"
   description: "\u4E0D\u5668\u7528\u3055\u306F\u4F53\u529B\u3067\u30AB\u30D0\u30FC\u3002\n\u4F7F\u3048\u308B\u6587\u5B57\u306F\u5C11\u306A\u3081\u3060\u304C\u3001\u4E00\u6483\u3054\u3068\u306E\u5A01\u529B\u306F\u9AD8\u3044\u305E\u3002"
+  idleSprite: {fileID: 21300000, guid: 1945f932d97edf2499bf606db48e8439, type: 3}
+  castingSprite: {fileID: 21300000, guid: 3b8bbaa4a1d8dbd48a3d6c730b5c48c6, type: 3}
+  spellCastSprite: {fileID: 21300000, guid: ad4361a3899dd614aa8d109bc38bba8d, type: 3}
+  damageSprite: {fileID: 21300000, guid: a54c5eec149a190428331fd8e45a1bc8, type: 3}
+  victorySprite: {fileID: 21300000, guid: 946ecd7acc9a145429e3628b0502656b, type: 3}
+  defeatSprite: {fileID: 21300000, guid: eb40e5186a6d5934db2e46c79ebb4160, type: 3}
   maxHP: 200
   availableCharacters: "\u30A2\u30A4\u30A6\u30A8\u30AA\u30AB\u30AD\u30AF\u30B1\u30B3\u30B5\u30B7\u30B9\u30BB\u30BD\u30BF\u30C1\u30C4\u30C6\u30C8\u30CA\u30CB\u30CC\u30CD\u30CE"
   manaGainPerPerfect: 10
@@ -24,3 +30,8 @@ MonoBehaviour:
   damageMultiplier: 2
   timeBonus: 0
   specialAbility: 
+  signatureStrings:
+  - "\u30DE\u30AA\u30F3"
+  - "\u30DE\u30C9\u30AB\u30CE\u30F3"
+  canPeekOpponentInput: 0
+  peekCharacterCount: 0

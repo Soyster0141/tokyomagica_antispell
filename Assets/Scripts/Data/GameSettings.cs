@@ -11,7 +11,7 @@ public class GameSettings : ScriptableObject
     public int maxStringLength = 10;
     
     [Tooltip("使用可能な文字リスト")]
-    public string availableCharacters = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポァィゥェォャュョッ";
+    public string availableCharacters = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポァィゥェォャュョッー";
     
     [Header("時間設定")]
     [Tooltip("初期制限時間（秒）")]

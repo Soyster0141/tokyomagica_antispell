@@ -24,7 +24,9 @@ public class StringCreationUI : MonoBehaviour
     
     private List<Button> characterButtons = new List<Button>();
     private string currentString = "";
+    private string cpuActualString = "";  // CPUが実際に入力している文字列
     private GameSettings settings;
+    private bool isCPUCreating = false;  // CPU詠唱中フラグ
     
     void Awake()
     {
@@ -98,14 +100,32 @@ public class StringCreationUI : MonoBehaviour
             instructionText.text = $"{playerName}: 呪文を詠唱せよ\n" +
                                   $"（{settings.minStringLength}～{settings.maxStringLength}文字）";
         }
+        
+        // CPUのターンなら自動で文字列作成
+        if (GameManager.Instance != null && GameManager.Instance.IsCPUPlayer(turnData.creatorPlayerNumber))
+        {
+            currentStringText.text = "";
+            StartCoroutine(HandleCPUStringCreation());
+        }
     }
     
     void ResetUI()
     {
+        // CPU詠唱中はリセットしない
+        if (isCPUCreating)
+        {
+            Debug.Log("[StringCreationUI] ResetUI: CPU詠唱中のためスキップ");
+            //return;
+        }
+        else 
+        {         
+        cpuActualString = "";  // 追加
         currentString = "";
+        isCPUCreating = false;  // 追加
         UpdateCurrentStringDisplay();
-        CreateCharacterButtons();
         UpdateConfirmButton();
+        }
+        CreateCharacterButtons();
     }
     
     void CreateCharacterButtons()
@@ -133,7 +153,7 @@ public class StringCreationUI : MonoBehaviour
             "ュィ",
             "ョゥ",
             "ッェ",
-            "　ォ"  // 5行目は1文字だけなので空白
+            "ーォ"  // 5行目は1文字だけなので空白 // 最後に「ー」を追加
         };
         
         // 濁音・半濁音（5列 × 5行）
@@ -146,14 +166,14 @@ public class StringCreationUI : MonoBehaviour
             "ポボドゾゴ"
         };
         
-        // 五十音（10列 × 5行）
+        // 五十音（10列 × 5行）+ 長音符
         string[] baseRows = new string[]
         {
             "ワラヤマハナタサカア",
             "ヲリ　ミヒニチシキイ",
             "　ルユムフヌツスクウ",
             "　レ　メヘネテセケエ",
-            "ンロヨモホノトソコオ"
+            "ンロヨモホノトソコオ"  
         };
         
         // 各行を処理
@@ -258,10 +278,34 @@ public class StringCreationUI : MonoBehaviour
         if (turn != null)
         {
             CharacterData playerCharacter = GameManager.Instance.GetPlayerCharacter(turn.creatorPlayerNumber);
-            if (playerCharacter != null)
+            string availableChars = playerCharacter != null 
+                ? playerCharacter.availableCharacters 
+                : (settings?.availableCharacters ?? "");
+            
+            // 禁止文字を取得して除外
+            string bannedChars = GameManager.Instance.GetBannedChars(turn.creatorPlayerNumber);
+            
+            if (!string.IsNullOrEmpty(bannedChars))
             {
-                return playerCharacter.availableCharacters;
+                // 禁止文字を除外した文字列を作成
+                string result = "";
+                foreach (char c in availableChars)
+                {
+                    if (!bannedChars.Contains(c.ToString()))
+                    {
+                        result += c;
+                    }
+                }
+                
+                if (settings.showDebugLogs)
+                {
+                    Debug.Log($"[StringCreationUI] Player {turn.creatorPlayerNumber} の使用可能文字: {result} (禁止: {bannedChars})");
+                }
+                
+                return result;
             }
+            
+            return availableChars;
         }
         
         // デフォルト
@@ -270,6 +314,12 @@ public class StringCreationUI : MonoBehaviour
     
     void OnCharacterButtonClicked(char character)
     {
+        // CPU詠唱中はボタン入力を受け付けない
+        if (isCPUCreating)
+        {
+            return;
+        }
+
         // SE再生
         if (AudioManager.Instance != null)
         {
@@ -302,15 +352,131 @@ public class StringCreationUI : MonoBehaviour
             UpdateConfirmButton();
         }
     }
-    
+
     void UpdateCurrentStringDisplay()
     {
         if (currentStringText != null)
         {
-            currentStringText.text = string.IsNullOrEmpty(currentString) ? "（呪文）" : currentString;
+            // CPU詠唱中は「X」でマスク（一部見える場合も）
+            if (isCPUCreating)
+            {
+                // 現在のプレイヤーの先読み能力を取得
+                int peekCount = GetCurrentPlayerPeekAbility();
+                
+                string displayText = CreateMaskedString(cpuActualString, peekCount);
+                currentStringText.text = string.IsNullOrEmpty(displayText) ? "（呪文）" : displayText;
+                
+                Debug.Log($"[StringCreationUI] CPU詠唱中表示更新: {displayText} (実際: {cpuActualString}, 先読み: {peekCount}文字)");
+            }
+            else
+            {
+                // 通常時は白
+                currentStringText.color = Color.white;
+                currentStringText.text = string.IsNullOrEmpty(currentString) ? "（呪文）" : currentString;
+            }
+        }
+        else
+        {
+            Debug.LogError("[StringCreationUI] currentStringText is null!");
         }
     }
     
+    /// <summary>
+    /// 現在のプレイヤーの先読み能力を取得
+    /// </summary>
+    int GetCurrentPlayerPeekAbility()
+    {
+        TurnData turn = GameManager.Instance?.GetCurrentTurn();
+        if (turn != null)
+        {
+            // CPUのターンなら、相手（プレイヤー）の能力を取得
+            int opponentPlayerNumber = turn.creatorPlayerNumber == 1 ? 2 : 1;
+            CharacterData opponentCharacter = GameManager.Instance.GetPlayerCharacter(opponentPlayerNumber);
+            
+            if (opponentCharacter != null)
+            {
+                return opponentCharacter.peekCharacterCount;
+            }
+        }
+        return 0;
+    }
+    
+    /// <summary>
+    /// 文字列をマスクする（先頭n文字だけ見える）
+    /// </summary>
+    string CreateMaskedString(string actualString, int visibleCount)
+    {
+        if (string.IsNullOrEmpty(actualString))
+        {
+            return "";
+        }
+        
+        // 先頭からvisibleCount文字だけ見える
+        int visible = Mathf.Min(visibleCount, actualString.Length);
+        string visiblePart = actualString.Substring(0, visible);
+        string maskedPart = new string('X', actualString.Length - visible);
+        
+        return visiblePart + maskedPart;
+    }
+
+    /// <summary>
+    /// CPUが文字を1文字追加(実際にボタンを押す演出を行う)
+    /// </summary>
+    public void CPUAddCharacter(char character)
+    {
+        Debug.Log($"[StringCreationUI] CPUAddCharacter呼び出し: {character}, isCPUCreating={isCPUCreating}");
+        
+        if (isCPUCreating)
+        {
+            // 実際の文字列に追加
+            cpuActualString += character;
+            Debug.Log($"[StringCreationUI] cpuActualString更新: {cpuActualString}");
+
+            // 該当するボタンを探して、視覚的フィードバックを発火
+            Button targetButton = FindButtonForCharacter(character);
+            if (targetButton != null)
+            {
+                // 一時的にボタンを有効化（アニメーション用）
+                bool wasInteractable = targetButton.interactable;
+                targetButton.interactable = true;
+                
+                // ボタンの視覚エフェクト（プレスアニメーション）をトリガー
+                // Note: onClickは呼ばない（currentStringに追加されてしまうので）
+                
+                // 元の状態に戻す
+                targetButton.interactable = wasInteractable;
+            }
+            
+            // 画面表示を更新（「？」でマスク表示される）
+            UpdateCurrentStringDisplay();
+
+            // SE再生
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayCharacterButtonClick();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 指定した文字のボタンを探す
+    /// </summary>
+    private Button FindButtonForCharacter(char character)
+    {
+        foreach (Button btn in characterButtons)
+        {
+            if (btn != null)
+            {
+                TextMeshProUGUI btnText = btn.GetComponentInChildren<TextMeshProUGUI>();
+                if (btnText != null && btnText.text == character.ToString())
+                {
+                    return btn;
+                }
+            }
+        }
+        return null;
+    }
+
     void UpdateConfirmButton()
     {
         if (confirmButton != null && settings != null)
@@ -364,6 +530,13 @@ public class StringCreationUI : MonoBehaviour
                     if (AudioManager.Instance != null)
                     {
                         AudioManager.Instance.PlaySpellCast();
+                    }
+                    
+                    // 魔法詠唱画像を一時的に表示
+                    PlayerHPUI[] hpUIs = FindObjectsOfType<PlayerHPUI>();
+                    foreach (PlayerHPUI hpUI in hpUIs)
+                    {
+                        hpUI.SetCharacterState(CharacterState.SpellCast);
                     }
                 }
             }
@@ -431,4 +604,69 @@ public class StringCreationUI : MonoBehaviour
             GameManager.Instance.OnStringCreated("");
         }
     }
+
+    /// <summary>
+    /// CPUの文字列作成を処理
+    /// </summary>
+    System.Collections.IEnumerator HandleCPUStringCreation()
+    {
+        Debug.Log("[StringCreationUI] HandleCPUStringCreation開始");
+        
+        // CPU詠唱中フラグON
+        isCPUCreating = true;
+        cpuActualString = "";  // リセット
+
+        Debug.Log($"[StringCreationUI] isCPUCreatingをTrueに設定: {isCPUCreating}");
+
+        // ボタンを無効化
+        foreach (var btn in characterButtons)
+        {
+            if (btn != null) btn.interactable = false;
+        }
+        if (confirmButton != null) confirmButton.interactable = false;
+
+        // CPUに文字列を作成させる（1文字ずつ）
+        CPUController cpu = GameManager.Instance.GetCPUController();
+
+        if (cpu != null)
+        {
+            Debug.Log("[StringCreationUI] CreateStringWithCallback呼び出し前");
+            yield return cpu.CreateStringWithCallback(this);
+            Debug.Log("[StringCreationUI] CreateStringWithCallback完了");
+        }
+
+        // アニメーションを停止
+        isCPUCreating = false;
+        Debug.Log($"[StringCreationUI] isCPUCreatingをFalseに設定: {isCPUCreating}");
+
+        // 実際に作成された文字列を currentString に設定
+        currentString = cpuActualString;
+
+        // タイマーを停止
+        if (creationTimer != null)
+        {
+            creationTimer.StopTimer();
+        }
+
+        // エフェクトを再生
+        if (spellCastEffect != null && currentStringText != null)
+        {
+            TurnData turn = GameManager.Instance.GetCurrentTurn();
+            if (turn != null)
+            {
+                PlayerData player = GameManager.Instance.GetPlayerData(turn.creatorPlayerNumber);
+                string playerName = player != null ? player.playerName : "";
+                spellCastEffect.PlayCastEffect(playerName, currentStringText.transform.position);
+
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySpellCast();
+                }
+            }
+        }
+
+        // 文字列作成完了
+        GameManager.Instance.OnStringCreated(currentString);
+    }
+
 }

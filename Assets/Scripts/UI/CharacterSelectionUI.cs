@@ -15,6 +15,7 @@ public class CharacterSelectionUI : MonoBehaviour
     [SerializeField] private GameObject characterButtonPrefab;
     
     [Header("キャラクター情報表示")]
+    [SerializeField] private Image characterPreviewImage;
     [SerializeField] private TextMeshProUGUI characterNameText;
     [SerializeField] private TextMeshProUGUI characterHPText;
     [SerializeField] private TextMeshProUGUI characterDescriptionText;
@@ -58,9 +59,30 @@ public class CharacterSelectionUI : MonoBehaviour
             Button btn = btnObj.GetComponent<Button>();
             TextMeshProUGUI btnText = btnObj.GetComponentInChildren<TextMeshProUGUI>();
             
+            // ボタンのテキストを設定
             if (btnText != null)
             {
                 btnText.text = character.characterName;
+            }
+            
+            // ボタンにキャラクター画像を追加（あれば）
+            Image btnImage = btnObj.GetComponent<Image>();
+            if (btnImage != null && character.idleSprite != null)
+            {
+                // ボタンの背景にキャラ画像を設定することもできるが、
+                // 今回は別のImageオブジェクトを使うことを前提にしている
+                
+                // ボタン内の"CharacterImage"という名前のImageを探す
+                Transform imageTransform = btnObj.transform.Find("CharacterImage");
+                if (imageTransform != null)
+                {
+                    Image charImage = imageTransform.GetComponent<Image>();
+                    if (charImage != null)
+                    {
+                        charImage.sprite = character.idleSprite;
+                        charImage.color = Color.white;
+                    }
+                }
             }
             
             CharacterData charData = character;
@@ -88,6 +110,23 @@ public class CharacterSelectionUI : MonoBehaviour
     void UpdateCharacterInfo()
     {
         if (selectedCharacter == null) return;
+        
+        // キャラクター画像を表示
+        if (characterPreviewImage != null)
+        {
+            // 待機中の画像を表示
+            if (selectedCharacter.idleSprite != null)
+            {
+                characterPreviewImage.sprite = selectedCharacter.idleSprite;
+                characterPreviewImage.color = Color.white;
+            }
+            else
+            {
+                // 画像がない場合はプレースホルダー（灰色）
+                characterPreviewImage.sprite = null;
+                characterPreviewImage.color = new Color(0.5f, 0.5f, 0.5f);
+            }
+        }
         
         if (characterNameText != null)
         {
@@ -137,6 +176,13 @@ public class CharacterSelectionUI : MonoBehaviour
     void ResetSelection()
     {
         selectedCharacter = null;
+        
+        // 画像をクリア
+        if (characterPreviewImage != null)
+        {
+            characterPreviewImage.sprite = null;
+            characterPreviewImage.color = new Color(0.3f, 0.3f, 0.3f);
+        }
         
         if (characterNameText != null)
             characterNameText.text = "キャラクターを選択してください";

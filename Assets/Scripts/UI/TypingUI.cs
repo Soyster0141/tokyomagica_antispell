@@ -22,6 +22,7 @@ public class TypingUI : MonoBehaviour
     private float timeRemaining;
     private float totalTime;
     private bool isTyping = false;
+    private bool isCPUTyping = false;  // CPUタイピング中フラグ
     
     // ローマ字バッファ
     private string romajiBuffer = "";
@@ -70,7 +71,9 @@ public class TypingUI : MonoBehaviour
         {"la", "ァ"}, {"xa", "ァ"}, {"li", "ィ"}, {"xi", "ィ"}, {"lu", "ゥ"}, {"xu", "ゥ"},
         {"le", "ェ"}, {"xe", "ェ"}, {"lo", "ォ"}, {"xo", "ォ"},
         {"lya", "ャ"}, {"xya", "ャ"}, {"lyu", "ュ"}, {"xyu", "ュ"}, {"lyo", "ョ"}, {"xyo", "ョ"},
-        {"ltu", "ッ"}, {"xtu", "ッ"}, {"ltsu", "ッ"}, {"xtsu", "ッ"}
+        {"ltu", "ッ"}, {"xtu", "ッ"}, {"ltsu", "ッ"}, {"xtsu", "ッ"},
+        // 長音符
+        {"-", "ー"}, {"nn", "ン"}
     };
     
     void Start()
@@ -153,6 +156,12 @@ public class TypingUI : MonoBehaviour
         
         UpdateInputDisplay();
         UpdateTimerDisplay();
+        
+        // CPUのターンなら自動でタイピングシミュレーション
+        if (GameManager.Instance.IsCPUPlayer(turn.typerPlayerNumber))
+        {
+            StartCoroutine(HandleCPUTyping());
+        }
     }
     
     void HandleInput()
@@ -190,10 +199,11 @@ public class TypingUI : MonoBehaviour
                         
                         // ローマ字バッファからカタカナに変換を試みる
                         string katakana = TryConvertRomajiToKatakana();
-                        if (!string.IsNullOrEmpty(katakana))
+                        while (!string.IsNullOrEmpty(katakana))
                         {
                             inputString += katakana;
-                            romajiBuffer = "";
+                            // 連続して変換できるか再度チェック
+                            katakana = TryConvertRomajiToKatakana();
                         }
                     }
                 }
@@ -211,6 +221,22 @@ public class TypingUI : MonoBehaviour
     string TryConvertRomajiToKatakana()
     {
         string lower = romajiBuffer.ToLower();
+        
+        // 子音の連続をチェック（促音の処理）- 3文字以上の場合のみ
+        if (lower.Length >= 3)
+        {
+            char thirdLastChar = lower[lower.Length - 3];
+            char secondLastChar = lower[lower.Length - 2];
+            char lastChar = lower[lower.Length - 1];
+            
+            // 同じ子音が2回連続し、その後に母音または'y'が来た場合（例：atta の tta、attya の tty）
+            if (IsConsonant(thirdLastChar) && thirdLastChar == secondLastChar && (IsVowel(lastChar) || lastChar == 'y'))
+            {
+                // 最初の子音を「ッ」に変換
+                romajiBuffer = romajiBuffer.Substring(romajiBuffer.Length - 2); // 最後の2文字（ta）を残す
+                return "ッ";
+            }
+        }
         
         // 「n」単独の特殊処理：次の文字が母音でない場合のみ「ン」に変換
         if (lower == "n")
@@ -240,7 +266,7 @@ public class TypingUI : MonoBehaviour
         }
         
         // 長い順に試す（例：「chi」を「c」「h」「i」より優先）
-        for (int len = Mathf.Min(lower.Length, 3); len >= 1; len--)
+        for (int len = Mathf.Min(lower.Length, 4); len >= 1; len--)
         {
             string sub = lower.Substring(lower.Length - len);
             if (romajiToKatakana.ContainsKey(sub))
@@ -252,6 +278,26 @@ public class TypingUI : MonoBehaviour
         }
         
         return null;
+    }
+    
+    /// <summary>
+    /// 子音かどうかを判定
+    /// </summary>
+    bool IsConsonant(char c)
+    {
+        c = char.ToLower(c);
+        // 母音以外を子音とする
+        return c >= 'a' && c <= 'z' && 
+               c != 'a' && c != 'i' && c != 'u' && c != 'e' && c != 'o';
+    }
+    
+    /// <summary>
+    /// 母音かどうかを判定
+    /// </summary>
+    bool IsVowel(char c)
+    {
+        c = char.ToLower(c);
+        return c == 'a' || c == 'i' || c == 'u' || c == 'e' || c == 'o';
     }
     
     void UpdateInputDisplay()
@@ -299,6 +345,24 @@ public class TypingUI : MonoBehaviour
         
         if (GameManager.Instance != null)
         {
+            // 完全防御判定（目標文字列を逆順にして比較）
+            string reversedTarget = ReverseString(targetString);
+            bool isPerfectDefense = (inputString == reversedTarget);
+            
+            Debug.Log($"[TypingUI] CompleteTyping - targetString: '{targetString}', reversedTarget: '{reversedTarget}', inputString: '{inputString}', isPerfectDefense: {isPerfectDefense}");
+            
+            if (isPerfectDefense)
+            {
+                TurnData turn = GameManager.Instance.GetCurrentTurn();
+                if (turn != null)
+                {
+                    // 完全防御成功！
+                    Debug.Log($"[TypingUI] 完全防御成功！GameManager.OnPerfectDefenseを呼び出します。");
+                    GameManager.Instance.OnPerfectDefense(turn.typerPlayerNumber, targetString);
+                    Debug.Log($"[TypingUI] 完全防御成功！Player {turn.creatorPlayerNumber} は次ターン、'{targetString}'の文字が使えません。");
+                }
+            }
+            
             GameManager.Instance.OnTypingCompleted(inputString);
         }
     }
@@ -308,5 +372,65 @@ public class TypingUI : MonoBehaviour
         char[] charArray = str.ToCharArray();
         System.Array.Reverse(charArray);
         return new string(charArray);
+    }
+    
+    /// <summary>
+    /// CPUのタイピングをシミュレーション
+    /// </summary>
+    IEnumerator HandleCPUTyping()
+    {
+        // キーボード入力を無効化
+        isTyping = false;
+        isCPUTyping = true;  // CPUタイピング中フラグON
+        
+        // CPUが入力している様子を「？？？」で表示
+        string reversedTarget = ReverseString(targetString);
+        StartCoroutine(AnimateCPUTyping(reversedTarget.Length));
+        
+        // CPUにタイピングさせる
+        CPUController cpu = GameManager.Instance.GetCPUController();
+        string cpuTypedString = "";
+        
+        if (cpu != null)
+        {
+            yield return cpu.SimulateTyping(targetString, timeRemaining, (result) => {
+                cpuTypedString = result;
+            });
+        }
+        
+        // アニメーションを停止
+        isCPUTyping = false;
+        
+        // 結果を表示
+        inputString = cpuTypedString;
+        UpdateInputDisplay();
+        
+        // 完了
+        CompleteTyping();
+    }
+    
+    /// <summary>
+    /// CPUが入力しているアニメーション
+    /// </summary>
+    IEnumerator AnimateCPUTyping(int targetLength)
+    {
+        float animationTime = 0f;
+        float updateInterval = 0.1f; // 0.1秒ごとに更新
+        
+        while (isCPUTyping)  // CPUタイピング中はアニメーションを続ける
+        {
+            // 「？」を少しずつ追加
+            int currentQuestions = Mathf.Min((int)(animationTime / updateInterval), targetLength);
+            
+            if (inputStringText != null)
+            {
+                string display = new string('？', currentQuestions);
+                inputStringText.text = display + "◌"; // ◌はカーソル
+
+            }
+            
+            animationTime += updateInterval;
+            yield return new WaitForSeconds(updateInterval);
+        }
     }
 }

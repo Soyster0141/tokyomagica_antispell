@@ -11,6 +11,10 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip confirmButtonClickSE;    // 確定ボタンクリック
     [SerializeField] private AudioClip spellCastSE;             // 呪文詠唱エフェクト
     
+    [Header("タイピングフェーズのSE")]
+    [SerializeField] private AudioClip perfectDefenseSE;        // 完全防御成功
+    [SerializeField] private AudioClip damageSE;                // ダメージ
+    
     [Header("音量設定")]
     [SerializeField] [Range(0f, 1f)] private float seVolume = 1.0f;
     
@@ -78,5 +82,21 @@ public class AudioManager : MonoBehaviour
     public void PlaySpellCast()
     {
         PlaySE(spellCastSE);
+    }
+    
+    /// <summary>
+    /// 完全防御成功音を再生
+    /// </summary>
+    public void PlayPerfectDefense()
+    {
+        PlaySE(perfectDefenseSE);
+    }
+    
+    /// <summary>
+    /// ダメージSEを再生
+    /// </summary>
+    public void PlayDamage()
+    {
+        PlaySE(damageSE);
     }
 }

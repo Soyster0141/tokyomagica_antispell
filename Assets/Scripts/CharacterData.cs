@@ -14,6 +14,25 @@ public class CharacterData : ScriptableObject
     [TextArea(3, 5)]
     public string description;
     
+    [Header("キャラクター画像")]
+    [Tooltip("待機中の画像")]
+    public Sprite idleSprite;
+    
+    [Tooltip("詠唱中の画像")]
+    public Sprite castingSprite;
+    
+    [Tooltip("魔法詠唱時の画像")]
+    public Sprite spellCastSprite;
+    
+    [Tooltip("ダメージ時の画像")]
+    public Sprite damageSprite;
+    
+    [Tooltip("勝利時の画像")]
+    public Sprite victorySprite;
+    
+    [Tooltip("敗北時の画像")]
+    public Sprite defeatSprite;
+    
     [Header("ステータス")]
     [Tooltip("最大HP")]
     public int maxHP = 100;
@@ -50,6 +69,15 @@ public class CharacterData : ScriptableObject
     [TextArea(2, 4)]
     public string specialAbility;
     
+    [Header("CPU用固有文字列")]
+    [Tooltip("このキャラクターが好んで使う文字列（CPUモード時）")]
+    public string[] signatureStrings;
+
+    [Header("相手の入力を覗き見できるか")]
+    public bool canPeekOpponentInput = false;
+    [Header("覗き見できる文字数")]
+    public int peekCharacterCount = 0; 
+
     /// <summary>
     /// 指定した文字がこのキャラクターで使用可能かチェック
     /// </summary>

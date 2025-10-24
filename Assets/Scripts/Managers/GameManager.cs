@@ -3,12 +3,34 @@ using UnityEngine.Events;
 using System.Collections;
 
 /// <summary>
+/// ゲームモード
+/// </summary>
+public enum GameMode
+{
+    PvP,    // プレイヤー vs プレイヤー
+    PvCPU   // プレイヤー vs CPU
+}
+
+/// <summary>
 /// ゲーム全体を管理するメインマネージャー
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     [Header("設定")]
     [SerializeField] private GameSettings settings;
+    
+    [Header("CPU設定")]
+    [SerializeField] private CPUController cpuController;
+    [SerializeField] private CPUDifficulty.Level cpuDifficulty = CPUDifficulty.Level.Normal;
+    
+    [Header("キャラクター画像")]
+    [SerializeField] private CharacterPortrait player1Portrait;
+    [SerializeField] private CharacterPortrait player2Portrait;
+    
+    [Header("演出")]
+    [SerializeField] private PerfectDefenseEffect perfectDefenseEffect;
+    [SerializeField] private DamageEffect player1DamageEffect;
+    [SerializeField] private DamageEffect player2DamageEffect;
     
     [Header("プレイヤー")]
     private PlayerData player1;
@@ -25,6 +47,12 @@ public class GameManager : MonoBehaviour
     private TurnData currentTurn;
     private int turnCounter = 0;
     private float currentTimeLimit;
+    private GameMode gameMode = GameMode.PvP;  // デフォルトはPvP
+    
+    [Header("禁止文字システム")]
+    // 各プレイヤーが使用できない文字のリスト
+    private string player1BannedChars = "";
+    private string player2BannedChars = "";
     
     [Header("イベント")]
     public UnityEvent<GameState> OnGameStateChanged;
@@ -107,6 +135,12 @@ public class GameManager : MonoBehaviour
         }
         
         OnTurnStarted?.Invoke(currentTurn);
+        
+        // 文字列作成中は詠唱中状態に
+        SetPlayerState(currentTurn.creatorPlayerNumber, CharacterState.Casting);
+        // タイピングするプレイヤーは待機中
+        SetPlayerState(currentTurn.typerPlayerNumber, CharacterState.Idle);
+        
         ChangeState(GameState.StringCreation);
     }
     
@@ -117,10 +151,18 @@ public class GameManager : MonoBehaviour
     {
         currentTurn.createdString = createdString;
         
+        // 詠唱完了時に、このプレイヤーの禁止文字をクリア
+        ClearBannedChars(currentTurn.creatorPlayerNumber);
+        
         if (settings.showDebugLogs)
         {
             Debug.Log($"作成された文字列: {createdString}");
         }
+        
+        // 魔法詠唱状態に変更（文字列作成したプレイヤー）
+        SetPlayerState(currentTurn.creatorPlayerNumber, CharacterState.SpellCast);
+        // タイピングするプレイヤーは防御詠唱中
+        SetPlayerState(currentTurn.typerPlayerNumber, CharacterState.Casting);
         
         ChangeState(GameState.Typing);
     }
@@ -150,6 +192,16 @@ public class GameManager : MonoBehaviour
         PlayerData damagedPlayer = GetPlayerData(currentTurn.typerPlayerNumber);
         damagedPlayer.TakeDamage(damage);
         
+        // ダメージエフェクトを再生
+        if (damage > 0)
+        {
+            DamageEffect damageEffect = currentTurn.typerPlayerNumber == 1 ? player1DamageEffect : player2DamageEffect;
+            if (damageEffect != null)
+            {
+                damageEffect.PlayDamageEffect(damage);
+            }
+        }
+        
         OnDamageDealt?.Invoke(currentTurn.typerPlayerNumber, damage);
         
         // 魔力獲得処理（タイピングしたプレイヤー）
@@ -177,6 +229,10 @@ public class GameManager : MonoBehaviour
         // ゲーム終了判定
         if (!damagedPlayer.IsAlive())
         {
+            // 勝敗の状態を設定
+            SetPlayerState(currentTurn.typerPlayerNumber, CharacterState.Defeat);
+            SetPlayerState(currentTurn.creatorPlayerNumber, CharacterState.Victory);
+            
             OnPlayerDefeated?.Invoke(currentTurn.typerPlayerNumber);
             OnGameWon?.Invoke(currentTurn.creatorPlayerNumber);
             ChangeState(GameState.GameOver);
@@ -187,6 +243,7 @@ public class GameManager : MonoBehaviour
             currentTimeLimit = Mathf.Max(settings.minTimeLimit, 
                                         currentTimeLimit - settings.timeDecreasePerTurn);
             
+            // ダメージ表示が終わるまで待ってから次のターンへ
             StartCoroutine(TransitionToNextTurn());
         }
     }
@@ -194,12 +251,46 @@ public class GameManager : MonoBehaviour
     IEnumerator TransitionToNextTurn()
     {
         ChangeState(GameState.TurnTransition);
-        yield return new WaitForSeconds(2f);
+        
+        // ダメージ表示用に2秒待つ（ダメージ表示期間）
+        yield return new WaitForSeconds(2.0f);
+        
+        // ダメージ表示が終わったら、次のターンを開始
+        // （StartNewTurnでCasting状態に変わる）
+        
         if (this != null && gameObject != null)
         {
             StartNewTurn();
         }
     }
+    
+    /// <summary>
+    /// 特定のプレイヤーの状態を設定
+    /// </summary>
+    private void SetPlayerState(int playerNumber, CharacterState state)
+    {
+        CharacterPortrait portrait = playerNumber == 1 ? player1Portrait : player2Portrait;
+        if (portrait != null)
+        {
+            portrait.SetState(state);
+        }
+    }
+    
+    /// <summary>
+    /// 両プレイヤーの状態を更新
+    /// </summary>
+    private void UpdateCharacterStates(CharacterState state)
+    {
+        if (player1Portrait != null)
+        {
+            player1Portrait.SetState(state);
+        }
+        if (player2Portrait != null)
+        {
+            player2Portrait.SetState(state);
+        }
+    }
+
     
     /// <summary>
     /// 前方一致で正しく入力できた文字数を計算
@@ -277,19 +368,59 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void InitializeGameWithCharacters(CharacterData char1, CharacterData char2)
     {
+        InitializeGameWithCharacters(char1, char2, GameMode.PvP, CPUDifficulty.Level.Normal);
+    }
+    
+    /// <summary>
+    /// キャラクター選択でゲームを初期化（ゲームモード指定）
+    /// </summary>
+    public void InitializeGameWithCharacters(CharacterData char1, CharacterData char2, GameMode mode, CPUDifficulty.Level difficulty)
+    {
         if (settings == null)
         {
             Debug.LogError("GameSettings が設定されていません！");
             return;
         }
         
+        // ゲームモードを設定
+        gameMode = mode;
+        cpuDifficulty = difficulty;
+        
         // キャラクターデータを保存
         player1Character = char1;
         player2Character = char2;
         
+        // ポートレートにキャラクターを設定
+        if (player1Portrait != null)
+        {
+            player1Portrait.SetCharacter(char1);
+        }
+        if (player2Portrait != null)
+        {
+            player2Portrait.SetCharacter(char2);
+        }
+        
         // プレイヤー初期化（キャラクターのHPを使用）
         player1 = new PlayerData(char1.characterName, char1.maxHP, 1);
-        player2 = new PlayerData(char2.characterName, char2.maxHP, 2);
+        
+        if (gameMode == GameMode.PvCPU)
+        {
+            player2 = new PlayerData("CPU (" + char2.characterName + ")", char2.maxHP, 2);
+            
+            // CPUを初期化
+            if (cpuController != null)
+            {
+                cpuController.Initialize(char2, settings, difficulty);
+            }
+            else
+            {
+                Debug.LogError("CPUController が設定されていません！");
+            }
+        }
+        else
+        {
+            player2 = new PlayerData(char2.characterName, char2.maxHP, 2);
+        }
         
         // 魔力システム初期化
         player1Mana = new ManaGrowthSystem(char1);
@@ -301,6 +432,8 @@ public class GameManager : MonoBehaviour
         // 最初のターン開始
         turnCounter = 0;
         ChangeState(GameState.Initialization);
+        
+        Debug.Log($"ゲーム開始: {gameMode}, 難易度: {cpuDifficulty}");
         
         StartCoroutine(StartFirstTurn());
     }
@@ -319,6 +452,30 @@ public class GameManager : MonoBehaviour
     public ManaGrowthSystem GetPlayerManaSystem(int playerNumber)
     {
         return playerNumber == 1 ? player1Mana : player2Mana;
+    }
+    
+    /// <summary>
+    /// 現在のゲームモードを取得
+    /// </summary>
+    public GameMode GetGameMode()
+    {
+        return gameMode;
+    }
+    
+    /// <summary>
+    /// 指定したプレイヤーがCPUかどうか
+    /// </summary>
+    public bool IsCPUPlayer(int playerNumber)
+    {
+        return gameMode == GameMode.PvCPU && playerNumber == 2;
+    }
+    
+    /// <summary>
+    /// CPUコントローラーを取得
+    /// </summary>
+    public CPUController GetCPUController()
+    {
+        return cpuController;
     }
     
     /// <summary>
@@ -351,6 +508,79 @@ public class GameManager : MonoBehaviour
             int winnerNumber = playerNumber == 1 ? 2 : 1;
             OnGameWon?.Invoke(winnerNumber);
             ChangeState(GameState.GameOver);
+        }
+    }
+    
+    // ========== 禁止文字システム ==========
+    
+    /// <summary>
+    /// 指定したプレイヤーの禁止文字を設定
+    /// </summary>
+    public void SetBannedChars(int playerNumber, string chars)
+    {
+        if (playerNumber == 1)
+        {
+            player1BannedChars = chars;
+        }
+        else
+        {
+            player2BannedChars = chars;
+        }
+        
+        if (settings.showDebugLogs)
+        {
+            Debug.Log($"[GameManager] Player {playerNumber} の禁止文字を設定: {chars}");
+        }
+    }
+    
+    /// <summary>
+    /// 指定したプレイヤーの禁止文字を取得
+    /// </summary>
+    public string GetBannedChars(int playerNumber)
+    {
+        return playerNumber == 1 ? player1BannedChars : player2BannedChars;
+    }
+    
+    /// <summary>
+    /// 指定したプレイヤーの禁止文字をクリア
+    /// </summary>
+    public void ClearBannedChars(int playerNumber)
+    {
+        if (playerNumber == 1)
+        {
+            player1BannedChars = "";
+        }
+        else
+        {
+            player2BannedChars = "";
+        }
+        
+        if (settings.showDebugLogs)
+        {
+            Debug.Log($"[GameManager] Player {playerNumber} の禁止文字をクリア");
+        }
+    }
+    
+    /// <summary>
+    /// 完全防御成功時の処理（相手の文字を禁止）
+    /// </summary>
+    public void OnPerfectDefense(int defenderPlayerNumber, string defendedString)
+    {
+        // 相手のプレイヤー番号
+        int opponentPlayerNumber = defenderPlayerNumber == 1 ? 2 : 1;
+        
+        // 防御した文字列の各文字を相手の禁止リストに追加
+        SetBannedChars(opponentPlayerNumber, defendedString);
+        
+        // 完全防御演出を再生
+        if (perfectDefenseEffect != null)
+        {
+            perfectDefenseEffect.PlayEffect(defendedString);
+        }
+        
+        if (settings.showDebugLogs)
+        {
+            Debug.Log($"[GameManager] 完全防御！Player {opponentPlayerNumber} は次のターン、以下の文字が使用できません: {defendedString}");
         }
     }
 }

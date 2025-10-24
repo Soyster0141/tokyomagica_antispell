@@ -7,6 +7,10 @@ public class CharacterSelectionManager : MonoBehaviour
 {
     [SerializeField] private CharacterSelectionUI selectionUI;
     
+    [Header("CPU設定")]
+    [SerializeField] private bool isCPUMode = false;
+    [SerializeField] private CPUDifficulty.Level cpuDifficulty = CPUDifficulty.Level.Normal;
+    
     private CharacterData player1SelectedCharacter;
     private CharacterData player2SelectedCharacter;
     
@@ -49,7 +53,28 @@ public class CharacterSelectionManager : MonoBehaviour
         if (GameManager.Instance != null)
         {
             Debug.Log($"ゲーム開始: {player1SelectedCharacter.characterName} vs {player2SelectedCharacter.characterName}");
-            GameManager.Instance.InitializeGameWithCharacters(player1SelectedCharacter, player2SelectedCharacter);
+            
+            // ゲームモードを決定
+            GameMode mode = isCPUMode ? GameMode.PvCPU : GameMode.PvP;
+            GameManager.Instance.InitializeGameWithCharacters(player1SelectedCharacter, player2SelectedCharacter, mode, cpuDifficulty);
+            
+            // キャラクター画像をPlayerHPUIに設定
+            PlayerHPUI[] hpUIs = FindObjectsOfType<PlayerHPUI>();
+            foreach (PlayerHPUI hpUI in hpUIs)
+            {
+                int playerNumber = hpUI.GetComponent<PlayerHPUI>() != null ? 
+                    System.Convert.ToInt32(hpUI.GetType().GetField("playerNumber", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(hpUI)) : 0;
+                
+                if (playerNumber == 1 && player1SelectedCharacter != null)
+                {
+                    hpUI.SetCharacter(player1SelectedCharacter);
+                }
+                else if (playerNumber == 2 && player2SelectedCharacter != null)
+                {
+                    hpUI.SetCharacter(player2SelectedCharacter);
+                }
+            }
         }
         else
         {

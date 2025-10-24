@@ -15,6 +15,7 @@ public class PlayerHPUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI hpText;
     [SerializeField] private Slider hpSlider;
     [SerializeField] private Image hpFillImage;
+    [SerializeField] private CharacterPortrait characterPortrait;
     
     [Header("HPバーの色")]
     [SerializeField] private Color highHPColor = Color.green;
@@ -46,6 +47,19 @@ public class PlayerHPUI : MonoBehaviour
     {
         if (damagedPlayerNumber == playerNumber)
         {
+            // ダメージが0より大きい場合はダメージ画像を表示
+            if (damage > 0 && characterPortrait != null)
+            {
+                Debug.Log($"[PlayerHPUI] Player {playerNumber} がダメージを受けました！Damage状態を表示します。");
+                characterPortrait.SetStateTemporary(CharacterState.Damage, 2.0f);
+            }
+            // ダメージが0の場合（完全防御）はSpellCast状態に変更
+            else if (damage == 0 && characterPortrait != null)
+            {
+                Debug.Log($"[PlayerHPUI] Player {playerNumber} は完全に防御しました！SpellCast状態に変更します。");
+                characterPortrait.SetState(CharacterState.SpellCast);
+            }
+            
             UpdateDisplay();
         }
     }
@@ -94,6 +108,28 @@ public class PlayerHPUI : MonoBehaviour
             {
                 hpFillImage.color = lowHPColor;
             }
+        }
+    }
+    
+    /// <summary>
+    /// キャラクターを設定
+    /// </summary>
+    public void SetCharacter(CharacterData character)
+    {
+        if (characterPortrait != null)
+        {
+            characterPortrait.SetCharacter(character);
+        }
+    }
+    
+    /// <summary>
+    /// キャラクターの状態を設定
+    /// </summary>
+    public void SetCharacterState(CharacterState state)
+    {
+        if (characterPortrait != null)
+        {
+            characterPortrait.SetState(state);
         }
     }
 }
